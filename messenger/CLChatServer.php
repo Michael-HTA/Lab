@@ -35,13 +35,22 @@ define('CLOSE', '1');
 $port = isset($argv[1]) ? (int)$argv[1] : DEFAULT_PORT;
 
 $listener = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
-socket_bind($listener, '127.0.0.1', $port);
+
+//to solve the unable to bind problem
+if (!socket_set_option($listener, SOL_SOCKET, SO_REUSEADDR, 1)) {
+
+    echo socket_strerror(socket_last_error($sock));
+
+    exit;
+
+}
+socket_bind($listener,'127.0.0.1',$port);
 socket_listen($listener);
 
 echo "Listening on port $port\n";
 
 $connection = socket_accept($listener);
-socket_close($listener);
+socket_shutdown($listener,2);
 
 // Send handshake with newline character at the end
 socket_write($connection, HANDSHAKE . "\n", strlen(HANDSHAKE) + 1);
@@ -66,7 +75,7 @@ while (true) {
         if ($messageIn[0] === CLOSE) {
             echo "Connection closed at other end.\n";
             socket_close($connection);
-            break;
+            return;
         }
         $messageIn = substr($messageIn, 1);
     }
@@ -75,12 +84,10 @@ while (true) {
     $messageOut = trim(fgets($userInput));
     if (strtolower($messageOut) === 'quit') {
         socket_write($connection, CLOSE . "\n", 2);
-        socket_close($connection);
+        socket_shutdown($connection,2);
         echo "Connection closed.\n";
-        break;
+        return;
     }
     socket_write($connection, MESSAGE . $messageOut . "\n", strlen(MESSAGE . $messageOut) + 1);
 }
 
-
-?>
